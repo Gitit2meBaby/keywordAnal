@@ -10,6 +10,9 @@ function App() {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysis, setAnalysis] = useState(null);
   const [error, setError] = useState(null);
+  const [mustInclude, setMustInclude] = useState('');
+  const [exclude, setExclude] = useState('');
+  const [keywordLength, setKeywordLength] = useState('any');
 
   const handleFileChange = (e) => {
     const selectedFile = e.target.files[0];
@@ -37,8 +40,12 @@ function App() {
         throw new Error('No keywords found in CSV. Please check the file format.');
       }
 
-      // Analyze keywords
-      const results = analyzeKeywords(keywords);
+      // Analyze keywords with filters
+      const results = analyzeKeywords(keywords, {
+        mustInclude: mustInclude.trim(),
+        exclude: exclude.trim(),
+        keywordLength: keywordLength
+      });
       setAnalysis(results);
     } catch (err) {
       setError(err.message);
@@ -76,8 +83,8 @@ function App() {
       <header className="header">
         <div className="header-content">
           <div>
-            <h1>📊 Google Ads Keyword Analyzer</h1>
-            <p>Upload your Google Ads Keyword Planner CSV export to analyze keyword opportunities</p>
+            <h1>📊 Google Ads Keyword Analyser</h1>
+            <p>Upload your Google Ads Keyword Planner CSV export to analyse keyword opportunities</p>
           </div>
           <HowTo />
         </div>
@@ -99,12 +106,81 @@ function App() {
             />
           </div>
 
+          {/* Filter Controls */}
+          <div className="filters-section">
+            <div className="filter-group">
+              <label htmlFor="must-include" className="filter-label">
+                Must Include
+                <span className="tooltip-wrapper">
+                  <span className="tooltip-icon">?</span>
+                  <span className="tooltip-text">
+                    Enter a word or phrase that must appear in the keywords. For example, "plumber" will only show keywords containing "plumber".
+                  </span>
+                </span>
+              </label>
+              <input
+                id="must-include"
+                type="text"
+                className="filter-input"
+                placeholder="e.g. plumber, emergency"
+                value={mustInclude}
+                onChange={(e) => setMustInclude(e.target.value)}
+              />
+            </div>
+
+            <div className="filter-group">
+              <label htmlFor="exclude" className="filter-label">
+                Exclude
+                <span className="tooltip-wrapper">
+                  <span className="tooltip-icon">?</span>
+                  <span className="tooltip-text">
+                    Enter words to exclude, separated by commas. Keywords containing any of these words will be hidden. For example, "free, cheap" will hide all keywords with "free" or "cheap".
+                  </span>
+                </span>
+              </label>
+              <input
+                id="exclude"
+                type="text"
+                className="filter-input"
+                placeholder="e.g. free, cheap, diy"
+                value={exclude}
+                onChange={(e) => setExclude(e.target.value)}
+              />
+            </div>
+
+            <div className="filter-group">
+              <label htmlFor="keyword-length" className="filter-label">
+                Keyword Length
+                <span className="tooltip-wrapper">
+                  <span className="tooltip-icon">?</span>
+                  <span className="tooltip-text">
+                    Filter keywords by the number of words. For example, selecting "3" will only show keywords with exactly 3 words like "emergency plumber sydney".
+                  </span>
+                </span>
+              </label>
+              <select
+                id="keyword-length"
+                className="filter-select"
+                value={keywordLength}
+                onChange={(e) => setKeywordLength(e.target.value)}
+              >
+                <option value="any">Any</option>
+                <option value="1">1 word</option>
+                <option value="2">2 words</option>
+                <option value="3">3 words</option>
+                <option value="4">4 words</option>
+                <option value="5">5 words</option>
+                <option value="6">6+ words</option>
+              </select>
+            </div>
+          </div>
+
           <button
             onClick={handleAnalyze}
             disabled={!file || isAnalyzing}
             className="analyze-button"
           >
-            {isAnalyzing ? 'Analyzing...' : 'Analyze Keywords'}
+            {isAnalyzing ? 'Analysing...' : 'Analyse Keywords'}
           </button>
         </section>
 
@@ -132,6 +208,24 @@ function App() {
                 </button>
               </div>
             </div>
+
+            {/* Filter Notice */}
+            {(analysis.filters.mustInclude || analysis.filters.exclude || analysis.filters.keywordLength !== 'any') && (
+              <div className="filter-notice">
+                <strong>Active Filters:</strong>
+                {analysis.filters.mustInclude && (
+                  <span className="filter-badge">Must include: "{analysis.filters.mustInclude}"</span>
+                )}
+                {analysis.filters.exclude && (
+                  <span className="filter-badge">Excluding: "{analysis.filters.exclude}"</span>
+                )}
+                {analysis.filters.keywordLength !== 'any' && (
+                  <span className="filter-badge">
+                    Length: {analysis.filters.keywordLength === '6' ? '6+ words' : `${analysis.filters.keywordLength} word${analysis.filters.keywordLength === '1' ? '' : 's'}`}
+                  </span>
+                )}
+              </div>
+            )}
 
             {/* Executive Summary */}
             <div className="summary-card">
@@ -173,7 +267,7 @@ function App() {
                       </tr>
                     </thead>
                     <tbody>
-                      {analysis.topKeywords.slice(0, 10).map((keyword, index) => (
+                      {analysis.topKeywords.map((keyword, index) => (
                         <tr key={index}>
                           <td className="keyword-text">{keyword.text}</td>
                           <td>{keyword.searches.toLocaleString()}</td>
@@ -198,6 +292,14 @@ function App() {
               </div>
             )}
 
+            {/* No Results Message */}
+            {analysis.topKeywords.length === 0 && (
+              <div className="results-card">
+                <h3>🎯 Top Recommendations</h3>
+                <p className="card-description">No keywords match your current filters. Try adjusting your "Must Include", "Exclude", or "Keyword Length" criteria.</p>
+              </div>
+            )}
+
             {/* Quick Wins */}
             {analysis.quickWins.length > 0 && (
               <div className="results-card">
@@ -216,52 +318,75 @@ function App() {
               </div>
             )}
 
-            {/* Competition Breakdown */}
-            <div className="results-card">
-              <h3>📊 Competition Breakdown</h3>
-              <div className="competition-chart">
-                <div className="competition-bar">
-                  <div
-                    className="bar-segment low"
-                    style={{
-                      width: `${(analysis.competitionBreakdown.low / analysis.newOpportunities) * 100}%`
-                    }}
-                  >
-                    <span>{analysis.competitionBreakdown.low}</span>
-                  </div>
-                  <div
-                    className="bar-segment medium"
-                    style={{
-                      width: `${(analysis.competitionBreakdown.medium / analysis.newOpportunities) * 100}%`
-                    }}
-                  >
-                    <span>{analysis.competitionBreakdown.medium}</span>
-                  </div>
-                  <div
-                    className="bar-segment high"
-                    style={{
-                      width: `${(analysis.competitionBreakdown.high / analysis.newOpportunities) * 100}%`
-                    }}
-                  >
-                    <span>{analysis.competitionBreakdown.high}</span>
-                  </div>
+            {/* Difficult Keywords */}
+            {analysis.difficultKeywords && analysis.difficultKeywords.length > 0 && (
+              <div className="results-card">
+                <h3>⚡ Difficult Keywords</h3>
+                <p className="card-description">High competition, high volume keywords - market leaders worth pursuing</p>
+                <div className="keywords-list">
+                  {analysis.difficultKeywords.map((keyword, index) => (
+                    <div key={index} className="keyword-item">
+                      <div className="keyword-name">{keyword.text}</div>
+                      <div className="keyword-meta">
+                        {keyword.searches.toLocaleString()} searches/mo • Competition: {keyword.competitionIndex}/100
+                        {keyword.topBidLow && keyword.topBidHigh && (
+                          <> • Est. CPC: {keyword.currency} {keyword.topBidLow.toFixed(2)}-{keyword.topBidHigh.toFixed(2)}</>
+                        )}
+                      </div>
+                    </div>
+                  ))}
                 </div>
-                <div className="competition-labels">
-                  <div className="label">
-                    <span className="color-dot low"></span>
-                    Low ({((analysis.competitionBreakdown.low / analysis.newOpportunities) * 100).toFixed(1)}%)
+              </div>
+            )}
+
+            {/* Competition Breakdown */}
+            {analysis.newOpportunities > 0 && (
+              <div className="results-card">
+                <h3>📊 Competition Breakdown</h3>
+                <div className="competition-chart">
+                  <div className="competition-bar">
+                    <div
+                      className="bar-segment low"
+                      style={{
+                        width: `${(analysis.competitionBreakdown.low / analysis.newOpportunities) * 100}%`
+                      }}
+                    >
+                      <span>{analysis.competitionBreakdown.low}</span>
+                    </div>
+                    <div
+                      className="bar-segment medium"
+                      style={{
+                        width: `${(analysis.competitionBreakdown.medium / analysis.newOpportunities) * 100}%`
+                      }}
+                    >
+                      <span>{analysis.competitionBreakdown.medium}</span>
+                    </div>
+                    <div
+                      className="bar-segment high"
+                      style={{
+                        width: `${(analysis.competitionBreakdown.high / analysis.newOpportunities) * 100}%`
+                      }}
+                    >
+                      <span>{analysis.competitionBreakdown.high}</span>
+                    </div>
                   </div>
-                  <div className="label">
-                    <span className="color-dot medium"></span>
-                    Medium ({((analysis.competitionBreakdown.medium / analysis.newOpportunities) * 100).toFixed(1)}%)
-                  </div>
-                  <div className="label">
-                    <span className="color-dot high"></span>
-                    High ({((analysis.competitionBreakdown.high / analysis.newOpportunities) * 100).toFixed(1)}%)
+                  <div className="competition-labels">
+                    <div className="label">
+                      <span className="color-dot low"></span>
+                      Low ({((analysis.competitionBreakdown.low / analysis.newOpportunities) * 100).toFixed(1)}%)
+                    </div>
+                    <div className="label">
+                      <span className="color-dot medium"></span>
+                      Medium ({((analysis.competitionBreakdown.medium / analysis.newOpportunities) * 100).toFixed(1)}%)
+                    </div>
+                    <div className="label">
+                      <span className="color-dot high"></span>
+                      High ({((analysis.competitionBreakdown.high / analysis.newOpportunities) * 100).toFixed(1)}%)
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
+            )}
 
             {/* Budget Recommendation */}
             {analysis.avgLowBid > 0 && (
@@ -282,7 +407,7 @@ function App() {
       </main>
 
       <footer className="footer">
-        <p>Google Ads Keyword Analyzer • Built for analyzing keyword opportunities</p>
+        <p>Google Ads Keyword Analyser • Built for analysing keyword opportunities</p>
       </footer>
     </div>
   );

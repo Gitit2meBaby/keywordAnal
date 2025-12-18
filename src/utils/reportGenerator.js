@@ -6,7 +6,33 @@ export const generateMarkdownReport = (analysis, fileName) => {
   let markdown = `# Google Ads Keyword Analysis Report\n\n`;
   markdown += `**Generated:** ${date}\n\n`;
   markdown += `**Source File:** ${fileName}\n\n`;
-  markdown += `**Total Keywords Analyzed:** ${analysis.totalKeywords}\n\n`;
+  markdown += `**Total Keywords Analysed:** ${analysis.totalKeywords}\n\n`;
+
+  // Add filter information if filters are active
+  if (
+    analysis.filters.mustInclude ||
+    analysis.filters.exclude ||
+    analysis.filters.keywordLength !== "any"
+  ) {
+    markdown += `**Active Filters:**\n`;
+    if (analysis.filters.mustInclude) {
+      markdown += `- Must Include: "${analysis.filters.mustInclude}"\n`;
+    }
+    if (analysis.filters.exclude) {
+      markdown += `- Excluding: "${analysis.filters.exclude}"\n`;
+    }
+    if (analysis.filters.keywordLength !== "any") {
+      const lengthText =
+        analysis.filters.keywordLength === "6"
+          ? "6+ words"
+          : `${analysis.filters.keywordLength} word${
+              analysis.filters.keywordLength === "1" ? "" : "s"
+            }`;
+      markdown += `- Keyword Length: ${lengthText}\n`;
+    }
+    markdown += `\n`;
+  }
+
   markdown += `---\n\n`;
 
   // Executive Summary
@@ -64,6 +90,26 @@ export const generateMarkdownReport = (analysis, fileName) => {
     markdown += `\n`;
   }
 
+  // Difficult Keywords
+  if (analysis.difficultKeywords && analysis.difficultKeywords.length > 0) {
+    markdown += `---\n\n## ⚡ Difficult Keywords (High Competition, High Volume)\n\n`;
+    markdown += `*Market-leading keywords worth pursuing with appropriate budget*\n\n`;
+    markdown += `| Keyword | Searches/mo | Competition Index | Est. CPC |\n`;
+    markdown += `|---------|-------------|-------------------|----------|\n`;
+
+    analysis.difficultKeywords.forEach((k) => {
+      const cpc =
+        k.topBidLow && k.topBidHigh
+          ? `${k.currency} ${k.topBidLow.toFixed(2)}-${k.topBidHigh.toFixed(2)}`
+          : "N/A";
+      markdown += `| ${k.text} | ${k.searches.toLocaleString()} | ${
+        k.competitionIndex
+      } | ${cpc} |\n`;
+    });
+
+    markdown += `\n`;
+  }
+
   // High Volume Keywords
   if (analysis.highVolume.length > 0) {
     markdown += `---\n\n## 📈 High Volume Keywords (5000+ searches/mo)\n\n`;
@@ -102,18 +148,24 @@ export const generateMarkdownReport = (analysis, fileName) => {
   markdown += `|-------------------|-------|------------|\n`;
 
   const totalNew = analysis.newOpportunities;
-  markdown += `| Low | ${analysis.competitionBreakdown.low} | ${(
-    (analysis.competitionBreakdown.low / totalNew) *
-    100
-  ).toFixed(1)}% |\n`;
-  markdown += `| Medium | ${analysis.competitionBreakdown.medium} | ${(
-    (analysis.competitionBreakdown.medium / totalNew) *
-    100
-  ).toFixed(1)}% |\n`;
-  markdown += `| High | ${analysis.competitionBreakdown.high} | ${(
-    (analysis.competitionBreakdown.high / totalNew) *
-    100
-  ).toFixed(1)}% |\n\n`;
+  if (totalNew > 0) {
+    markdown += `| Low | ${analysis.competitionBreakdown.low} | ${(
+      (analysis.competitionBreakdown.low / totalNew) *
+      100
+    ).toFixed(1)}% |\n`;
+    markdown += `| Medium | ${analysis.competitionBreakdown.medium} | ${(
+      (analysis.competitionBreakdown.medium / totalNew) *
+      100
+    ).toFixed(1)}% |\n`;
+    markdown += `| High | ${analysis.competitionBreakdown.high} | ${(
+      (analysis.competitionBreakdown.high / totalNew) *
+      100
+    ).toFixed(1)}% |\n\n`;
+  } else {
+    markdown += `| Low | 0 | 0% |\n`;
+    markdown += `| Medium | 0 | 0% |\n`;
+    markdown += `| High | 0 | 0% |\n\n`;
+  }
 
   // Recommendations
   markdown += `---\n\n## 💡 Strategy Recommendations\n\n`;
@@ -127,8 +179,12 @@ export const generateMarkdownReport = (analysis, fileName) => {
     markdown += `2. **Target Long-Tail Keywords**: The ${analysis.longTail.length} long-tail keywords typically convert better\n`;
   }
 
-  markdown += `3. **Monitor Competition**: ${analysis.competitionBreakdown.high} high-competition keywords may require higher budgets\n`;
-  markdown += `4. **Test and Iterate**: Start with top 10-20 keywords and expand based on performance\n\n`;
+  if (analysis.difficultKeywords && analysis.difficultKeywords.length > 0) {
+    markdown += `3. **Consider Difficult Keywords**: ${analysis.difficultKeywords.length} high-competition keywords represent market leaders - pursue with adequate budget\n`;
+  }
+
+  markdown += `4. **Monitor Competition**: ${analysis.competitionBreakdown.high} high-competition keywords may require higher budgets\n`;
+  markdown += `5. **Test and Iterate**: Start with top 10-20 keywords and expand based on performance\n\n`;
 
   markdown += `### Budget Allocation\n\n`;
 
@@ -155,7 +211,7 @@ export const generateMarkdownReport = (analysis, fileName) => {
   markdown += `- High competition: 1 point\n\n`;
 
   markdown += `---\n\n`;
-  markdown += `*Report generated by Google Ads Keyword Analyzer*\n`;
+  markdown += `*Report generated by Google Ads Keyword Analyser*\n`;
 
   return markdown;
 };
