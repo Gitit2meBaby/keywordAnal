@@ -164,7 +164,7 @@ function App() {
                 <strong>
                   {file ? "Upload a new file" : "Choose CSV file"}
                 </strong>
-                <span>or drag and drop here</span>
+                <span> or drag and drop here</span>
               </div>
             </label>
           </div>
